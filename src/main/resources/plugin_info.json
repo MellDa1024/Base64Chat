@@ -1,11 +1,10 @@
 {
-  "name": "ExamplePlugin",
+  "name": "Base64Chat",
   "version": "1.0",
-  "description": "Example implementation of a plugin for Lambda.",
-  "url": "https://github.com/lambda-client/ExamplePlugin",
-  "authors": [ "me", "you" ],
-  "main_class": "com.lambda.ExamplePlugin",
+  "description": "Chat with base64!q  .",
+  "url": "https://github.com/MellDa1024/Base64Chat",
+  "authors": [ "Mell_Da", "hongsh373" ],
+  "main_class": "com.mellda.ChatPlugin",
   "min_api_version": "3.0",
-  "mixins": [ "mixins.ExamplePlugin.json" ],
   "required_plugins": []
 }
