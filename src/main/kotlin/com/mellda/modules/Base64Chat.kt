@@ -1,15 +1,11 @@
 package com.mellda.modules
 
-import com.lambda.client.event.events.PacketEvent
 import com.lambda.client.manager.managers.MessageManager.newMessageModifier
 import com.mellda.ChatPlugin
 import com.lambda.client.module.Category
-import com.lambda.client.module.modules.chat.ChatTimestamp
 import com.lambda.client.plugin.api.PluginModule
 import com.lambda.client.util.text.MessageSendHelper
-import com.lambda.client.util.text.MessageSendHelper.sendServerMessage
 import com.lambda.client.util.threads.safeListener
-import net.minecraft.network.play.client.CPacketChatMessage
 import net.minecraft.util.text.TextComponentString
 import net.minecraftforge.client.event.ClientChatReceivedEvent
 import java.util.*
@@ -25,8 +21,10 @@ internal object Base64Chat : PluginModule(
     description = "Chats with base64!",
     pluginMain = ChatPlugin
 ) {
+    private val twob2tMode by setting("2B2T Mode", true, description = "Make chat length limit to 144.")
     private val originalChat by setting("Print Original Chat", true)
-    private val chatPattern = Pattern.compile("<([0-9a-zA-Z_]+)> (.*)")
+    private val chatPattern = Pattern.compile("<([0-9a-zA-Z_]+)> (b64.*)")
+    private val colorChatPattern = Pattern.compile("<([0-9a-zA-Z_§]+)> (b64.*)")
 
     private val modifier = newMessageModifier(
         modifier = {
@@ -62,23 +60,23 @@ internal object Base64Chat : PluginModule(
         }
 
         safeListener<ClientChatReceivedEvent> {
-            val rawMessage = removecolorcode(it.message.unformattedText)
+            val rawMessage = removeColorCode(it.message.unformattedText)
             val patternedMessage = chatPattern.matcher(rawMessage)
             if (patternedMessage.find()) {
+                val patternedMessage2 = colorChatPattern.matcher(it.message.unformattedText)
+                var playerName = patternedMessage.group(1)
+                if (patternedMessage2.find()) {
+                    playerName = patternedMessage2.group(1)
+                }
                 val onlyMessage = patternedMessage.group(2)
-                if (onlyMessage.length > 7) {
-                    if (onlyMessage.slice(IntRange(0,5)) == "base64") {
-                        if (patternedMessage.group(1) != mc.session.username) {
-                            val encodedMessage = onlyMessage.slice(IntRange(6, onlyMessage.length - 1))
-                            val decodedMessage = decode(encodedMessage)
-                            if (decodedMessage == "") {
-                                it.isCanceled = true
-                                MessageSendHelper.sendErrorMessage("$chatName ${patternedMessage.group(1)} send non-valid base64 String.\nOriginal Message : $onlyMessage")
-                            } else {
-                                if (originalChat) MessageSendHelper.sendChatMessage("Original Message : " + it.message.formattedText)
-                                it.message = TextComponentString("<${(patternedMessage.group(1))}> $decodedMessage")
-                            }
-                        }
+                if (removeColorCode(playerName) != mc.session.username) {
+                    val decodedMessage = decode(onlyMessage.slice(IntRange(3, onlyMessage.length - 1)))
+                    if (decodedMessage == "") {
+                        it.isCanceled = true
+                        MessageSendHelper.sendErrorMessage("$chatName $playerName§r send non-valid base64 String.\nOriginal Message : $onlyMessage")
+                    } else {
+                        if (originalChat) MessageSendHelper.sendChatMessage("Original Message : " + it.message.formattedText)
+                        it.message = TextComponentString("<${playerName}§r> $decodedMessage")
                     }
                 }
             }
@@ -88,11 +86,16 @@ internal object Base64Chat : PluginModule(
     private fun encode(message : String) : String {
         val encoder: Base64.Encoder = Base64.getEncoder()
         var encoded: String = encoder.encodeToString(message.toByteArray())
-        if (encoded.length <= 250) {
-            encoded = "base64$encoded"
+        val maxlength = if (twob2tMode) {
+            141
+        } else {
+            250
+        }
+        if (encoded.length <= maxlength) {
+            encoded = "b64$encoded"
         } else {
             encoded = ""
-            MessageSendHelper.sendWarningMessage("Cancelling Message because the Encoded message's length is more than 250.")
+            MessageSendHelper.sendWarningMessage("Cancelling Message because the Encoded message's length is longer than ${maxlength}.")
         }
         return encoded
     }
@@ -109,7 +112,7 @@ internal object Base64Chat : PluginModule(
         }
     }
 
-    private fun removecolorcode(message: String): String {
+    private fun removeColorCode(message: String): String {
         val colorcode = arrayOf("§0","§1","§2","§3","§4","§5","§6","§7","§8","§9","§a","§b","§c","§d","§e","§f","§k","§l","§m","§n","§o","§r")
         var temp = message
         for (i in colorcode) {
