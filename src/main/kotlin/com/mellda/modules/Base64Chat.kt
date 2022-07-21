@@ -1,5 +1,6 @@
 package com.mellda.modules
 
+import com.lambda.client.manager.managers.FriendManager
 import com.lambda.client.manager.managers.MessageManager.newMessageModifier
 import com.mellda.ChatPlugin
 import com.lambda.client.module.Category
@@ -24,13 +25,18 @@ internal object Base64Chat : PluginModule(
 ) {
     private val encode by setting("Encode", true)
     private val decode by setting("Decode", true)
+    private val decodeOnlyFriend by setting("Decode Only Friend", false, { decode }, description = "Only decode friend's message.")
     private val twob2tMode by setting("2B2T Mode", true, description = "Make chat length limit to 144.")
     private val originalChat by setting("Print Original Chat", true)
+    private val disableOnCommand by setting("Disable on Command", true, description = "Stops encoding when you are using command.")
     private val chatColor by setting("Chat Color", EnumTextColor.WHITE, description = "Highlight Message(Original Message when send / Decoded Message when received) with color.")
     private val chatPattern = Pattern.compile("<([0-9a-zA-Z_]+)> (b64.*)")
     private val colorChatPattern = Pattern.compile("<([0-9a-zA-Z_§]+)> (b64.*)")
 
     private val modifier = newMessageModifier(
+        filter = {
+            (disableOnCommand && !it.packet.message.startsWith("/")) || !disableOnCommand
+        },
         modifier = {
             if (encode && originalChat) MessageSendHelper.sendChatMessage("Original Message : ${chatColor}${it.packet.message}")
             val message = if (encode) {
@@ -79,6 +85,7 @@ internal object Base64Chat : PluginModule(
                 }
                 val onlyMessage = patternedMessage.group(2)
                 if (removeColorCode(playerName) != mc.session.username) {
+                    if (decodeOnlyFriend && !FriendManager.isFriend(removeColorCode(playerName))) return@safeListener
                     val decodedMessage = decode(onlyMessage.slice(IntRange(3, onlyMessage.length - 1)))
                     if (decodedMessage == "") {
                         it.isCanceled = true

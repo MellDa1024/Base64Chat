@@ -8,6 +8,7 @@ internal object ChatPlugin : Plugin() {
 
     override fun onLoad() {
         MessageSendHelper.sendWarningMessage("If base64-encoded chat's length is longer than maximum chat length, it will be cancelled.")
+        MessageSendHelper.sendWarningMessage("DO NOT SEND SECRET INFORMATION WITH THIS MODULE, ANYBODY CAN DECODE IT EASILY.")
         modules.add(Base64Chat)
     }
 
