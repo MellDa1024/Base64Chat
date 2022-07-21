@@ -4,6 +4,7 @@ import com.lambda.client.manager.managers.MessageManager.newMessageModifier
 import com.mellda.ChatPlugin
 import com.lambda.client.module.Category
 import com.lambda.client.plugin.api.PluginModule
+import com.lambda.client.util.color.EnumTextColor
 import com.lambda.client.util.text.MessageSendHelper
 import com.lambda.client.util.threads.safeListener
 import net.minecraft.util.text.TextComponentString
@@ -18,18 +19,25 @@ import kotlin.math.min
 internal object Base64Chat : PluginModule(
     name = "Base64Chat",
     category = Category.CHAT,
-    description = "Chats with base64!",
+    description = "Chat with base64!",
     pluginMain = ChatPlugin
 ) {
+    private val encode by setting("Encode", true)
+    private val decode by setting("Decode", true)
     private val twob2tMode by setting("2B2T Mode", true, description = "Make chat length limit to 144.")
     private val originalChat by setting("Print Original Chat", true)
+    private val chatColor by setting("Chat Color", EnumTextColor.WHITE, description = "Highlight Message(Original Message when send / Decoded Message when received) with color.")
     private val chatPattern = Pattern.compile("<([0-9a-zA-Z_]+)> (b64.*)")
     private val colorChatPattern = Pattern.compile("<([0-9a-zA-Z_§]+)> (b64.*)")
 
     private val modifier = newMessageModifier(
         modifier = {
-            if (originalChat) MessageSendHelper.sendChatMessage("Original Message : ${it.packet.message}")
-            val message = encode(it.packet.message)
+            if (encode && originalChat) MessageSendHelper.sendChatMessage("Original Message : ${chatColor}${it.packet.message}")
+            val message = if (encode) {
+                encode(it.packet.message)
+            } else {
+                it.packet.message
+            }
             message.substring(0, min(256, message.length))
         }
     )
@@ -60,6 +68,7 @@ internal object Base64Chat : PluginModule(
         }
 
         safeListener<ClientChatReceivedEvent> {
+            if (!decode) return@safeListener
             val rawMessage = removeColorCode(it.message.unformattedText)
             val patternedMessage = chatPattern.matcher(rawMessage)
             if (patternedMessage.find()) {
@@ -76,7 +85,7 @@ internal object Base64Chat : PluginModule(
                         MessageSendHelper.sendErrorMessage("$chatName $playerName§r send non-valid base64 String.\nOriginal Message : $onlyMessage")
                     } else {
                         if (originalChat) MessageSendHelper.sendChatMessage("Original Message : " + it.message.formattedText)
-                        it.message = TextComponentString("<${playerName}§r> $decodedMessage")
+                        it.message = TextComponentString("<${playerName}§r>$chatColor $decodedMessage")
                     }
                 }
             }
