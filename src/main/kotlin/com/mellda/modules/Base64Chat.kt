@@ -91,7 +91,6 @@ internal object Base64Chat : PluginModule(
                 }
                 val playerName = if (messagePair.first.find()) { messagePair.first.group(1)
                 } else { messagePair.second.group(1) }
-                LambdaMod.LOG.info(playerName)
                 val onlyMessage = messagePair.second.group(2)
                 if (removeColorCode(playerName) != mc.session.username) {
                     if (decodeOnlyFriend && !FriendManager.isFriend(removeColorCode(playerName))) return@safeListener
