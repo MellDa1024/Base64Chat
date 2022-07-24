@@ -1,5 +1,6 @@
 package com.mellda.modules
 
+import com.lambda.client.LambdaMod
 import com.lambda.client.manager.managers.FriendManager
 import com.lambda.client.manager.managers.MessageManager.newMessageModifier
 import com.mellda.ChatPlugin
@@ -24,14 +25,19 @@ internal object Base64Chat : PluginModule(
     pluginMain = ChatPlugin
 ) {
     private val encode by setting("Encode", true)
+    private val encodeWithGreenChat by setting("Enable Green Chat", true, { encode }, description = "Move > to prefix when player try to use Green Chat, chat length limit will decrease by 2.")
     private val decode by setting("Decode", true)
     private val decodeOnlyFriend by setting("Decode Only Friend", false, { decode }, description = "Only decode friend's message.")
     private val twob2tMode by setting("2B2T Mode", true, description = "Make chat length limit to 144.")
     private val originalChat by setting("Print Original Chat", true)
     private val disableOnCommand by setting("Disable on Command", true, description = "Stops encoding when you are using command.")
     private val chatColor by setting("Chat Color", EnumTextColor.WHITE, description = "Highlight Message(Original Message when send / Decoded Message when received) with color.")
+    private val overwriteGreenChat by setting("Overwrite Green Chat", false, { chatColor != EnumTextColor.GREEN } ,description = "Overwrite Green chat to Chat Color.")
+
     private val chatPattern = Pattern.compile("<([0-9a-zA-Z_]+)> (b64.*)")
+    private val greenChatPattern = Pattern.compile("<([0-9a-zA-Z_]+)> (> b64.*)")
     private val colorChatPattern = Pattern.compile("<([0-9a-zA-Z_§]+)> (b64.*)")
+    private val greenColorChatPattern = Pattern.compile("<([0-9a-zA-Z_§]+)> (> b64.*)")
 
     private val modifier = newMessageModifier(
         filter = {
@@ -41,9 +47,7 @@ internal object Base64Chat : PluginModule(
             if (encode && originalChat) MessageSendHelper.sendChatMessage("Original Message : ${chatColor}${it.packet.message}")
             val message = if (encode) {
                 encode(it.packet.message)
-            } else {
-                it.packet.message
-            }
+            } else { it.packet.message }
             message.substring(0, min(256, message.length))
         }
     )
@@ -77,41 +81,58 @@ internal object Base64Chat : PluginModule(
             if (!decode) return@safeListener
             val rawMessage = removeColorCode(it.message.unformattedText)
             val patternedMessage = chatPattern.matcher(rawMessage)
-            if (patternedMessage.find()) {
-                val patternedMessage2 = colorChatPattern.matcher(it.message.unformattedText)
-                var playerName = patternedMessage.group(1)
-                if (patternedMessage2.find()) {
-                    playerName = patternedMessage2.group(1)
+            val patternedMessageGreen = greenChatPattern.matcher(rawMessage)
+            val isGreenChat = patternedMessageGreen.find()
+            if (patternedMessage.find() || isGreenChat) {
+                val messagePair = if (isGreenChat) {
+                    Pair(greenColorChatPattern.matcher(it.message.unformattedText), patternedMessageGreen)
+                } else {
+                    Pair(colorChatPattern.matcher(it.message.unformattedText), patternedMessage)
                 }
-                val onlyMessage = patternedMessage.group(2)
+                val playerName = if (messagePair.first.find()) { messagePair.first.group(1)
+                } else { messagePair.second.group(1) }
+                LambdaMod.LOG.info(playerName)
+                val onlyMessage = messagePair.second.group(2)
                 if (removeColorCode(playerName) != mc.session.username) {
                     if (decodeOnlyFriend && !FriendManager.isFriend(removeColorCode(playerName))) return@safeListener
-                    val decodedMessage = decode(onlyMessage.slice(IntRange(3, onlyMessage.length - 1)))
+                    val decodedMessage = if (isGreenChat) {
+                        decode(onlyMessage.slice(IntRange(5, onlyMessage.length - 1)))
+                    } else {
+                        decode(onlyMessage.slice(IntRange(3, onlyMessage.length - 1)))
+                    }
                     if (decodedMessage == "") {
                         it.isCanceled = true
-                        MessageSendHelper.sendErrorMessage("$chatName $playerName§r send non-valid base64 String.\nOriginal Message : $onlyMessage")
+                        MessageSendHelper.sendErrorMessage("$chatName $playerName§r send non-valid base64 String.\nOriginal Message : ${returnColor(isGreenChat, true)}$onlyMessage")
                     } else {
                         if (originalChat) MessageSendHelper.sendChatMessage("Original Message : " + it.message.formattedText)
-                        it.message = TextComponentString("<${playerName}§r>$chatColor $decodedMessage")
+                        it.message = TextComponentString("<${playerName}§r> ${returnColor(isGreenChat)}$decodedMessage")
                     }
                 }
             }
         }
     }
 
+    private fun returnColor(isGreenChat : Boolean, blank : Boolean = false) : String {
+        return if (blank) {
+            if (isGreenChat) { "§a" } else { "" }
+        } else {
+            if (isGreenChat) { if (overwriteGreenChat) { "$chatColor> " } else { "§a> " } }
+            else { "$chatColor" }
+        }
+    }
     private fun encode(message : String) : String {
         val encoder: Base64.Encoder = Base64.getEncoder()
-        var encoded: String = encoder.encodeToString(message.toByteArray())
-        val maxlength = if (twob2tMode) {
-            141
-        } else {
-            250
-        }
-        if (encoded.length <= maxlength) {
-            encoded = "b64$encoded"
-        } else {
+        var maxlength = if (twob2tMode) { 144 } else { 255 }
+        var shouldEncodeWithGreen = false
+        if (message.length > 2) { shouldEncodeWithGreen = (message.slice(IntRange(0, 1)) == "> " && encodeWithGreenChat) }
+        val modifiedMessage = if (shouldEncodeWithGreen) { message.slice(IntRange(2, message.length-1)) } else { message }
+        var encoded: String = encoder.encodeToString(modifiedMessage.toByteArray())
+        encoded = "b64$encoded"
+        if (shouldEncodeWithGreen) encoded = "> $encoded"
+        if (encoded.length > maxlength) {
             encoded = ""
-            MessageSendHelper.sendWarningMessage("Cancelling Message because the Encoded message's length is longer than ${maxlength}.")
+            if (shouldEncodeWithGreen) maxlength -= 2
+            MessageSendHelper.sendWarningMessage("Cancelling Message because the Encoded message's length is longer than ${maxlength - 3}.")
         }
         return encoded
     }
