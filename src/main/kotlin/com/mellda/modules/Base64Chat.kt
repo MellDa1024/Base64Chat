@@ -34,10 +34,10 @@ internal object Base64Chat : PluginModule(
     private val chatColor by setting("Chat Color", EnumTextColor.WHITE, description = "Highlight Message(Original Message when send / Decoded Message when received) with color.")
     private val overwriteGreenChat by setting("Overwrite Green Chat", false, { chatColor != EnumTextColor.GREEN } ,description = "Overwrite Green chat to Chat Color.")
 
-    private val chatPattern = Pattern.compile("<([0-9a-zA-Z_]+)> (b64.*)")
-    private val greenChatPattern = Pattern.compile("<([0-9a-zA-Z_]+)> (> b64.*)")
-    private val colorChatPattern = Pattern.compile("<([0-9a-zA-Z_§]+)> (b64.*)")
-    private val greenColorChatPattern = Pattern.compile("<([0-9a-zA-Z_§]+)> (> b64.*)")
+    private val chatPattern = Pattern.compile("^<([0-9a-zA-Z_]+)> (b64.*)")
+    private val greenChatPattern = Pattern.compile("^<([0-9a-zA-Z_]+)> (> b64.*)")
+    private val colorChatPattern = Pattern.compile("^<([0-9a-zA-Z_§]+)> (b64.*)")
+    private val greenColorChatPattern = Pattern.compile("^<([0-9a-zA-Z_§]+)> (> b64.*)")
 
     private val modifier = newMessageModifier(
         filter = {
