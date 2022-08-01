@@ -123,8 +123,8 @@ internal object Base64Chat : PluginModule(
         val encoder: Base64.Encoder = Base64.getEncoder()
         var maxlength = if (twob2tMode) { 144 } else { 255 }
         var shouldEncodeWithGreen = false
-        if (message.length > 2) { shouldEncodeWithGreen = (message.slice(IntRange(0, 1)) == "> " && encodeWithGreenChat) }
-        val modifiedMessage = if (shouldEncodeWithGreen) { message.slice(IntRange(2, message.length-1)) } else { message }
+        if (message.length > 1) { shouldEncodeWithGreen = (message.slice(IntRange(0, 0)) == ">" && encodeWithGreenChat) }
+        val modifiedMessage = if (shouldEncodeWithGreen) { message.replaceFirst(">", "").trimStart() } else { message }
         var encoded: String = encoder.encodeToString(modifiedMessage.toByteArray())
         encoded = "b64$encoded"
         if (shouldEncodeWithGreen) encoded = "> $encoded"
